@@ -38,6 +38,7 @@ let mainWindow;
 let activeView = null;
 let views = {};
 let sidebarVisible = true;
+let shortcutsVisible = false;
 const SIDEBAR_WIDTH = 56;
 
 function createWindow() {
@@ -47,9 +48,7 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     title: 'AI Chat',
-    backgroundColor: '#1a1a2e',
-    frame: false,
-    titleBarStyle: 'hidden',
+    backgroundColor: '#000000',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -73,7 +72,6 @@ function createWindow() {
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
-        // Persist sessions so logins are saved
         partition: `persist:${key}`,
       },
     });
@@ -84,7 +82,6 @@ function createWindow() {
     // Open external links in default browser
     view.webContents.setWindowOpenHandler(({ url }) => {
       const { shell } = require('electron');
-      // Allow same-origin popups (like Google login)
       const svcOrigin = new URL(svc.url).origin;
       const linkOrigin = new URL(url).origin;
       if (linkOrigin === svcOrigin) {
@@ -107,21 +104,20 @@ function createWindow() {
 
 function layoutViews() {
   if (!activeView || !mainWindow) return;
+  if (shortcutsVisible) return; // don't layout when shortcuts overlay is up
   const [width, height] = mainWindow.getContentSize();
-  const titleBarHeight = 38;
   const sidebarW = sidebarVisible ? SIDEBAR_WIDTH : 0;
   activeView.setBounds({
     x: sidebarW,
-    y: titleBarHeight,
+    y: 0,
     width: width - sidebarW,
-    height: height - titleBarHeight,
+    height: height,
   });
 }
 
 function switchService(key) {
   if (!views[key]) return;
 
-  // Remove current view
   if (activeView) {
     mainWindow.removeBrowserView(activeView);
   }
@@ -130,7 +126,6 @@ function switchService(key) {
   mainWindow.addBrowserView(activeView);
   layoutViews();
 
-  // Notify renderer which service is active
   mainWindow.webContents.send('service-changed', key);
 }
 
@@ -163,16 +158,25 @@ ipcMain.on('toggle-sidebar', () => {
   layoutViews();
 });
 
-ipcMain.on('window-minimize', () => mainWindow.minimize());
-ipcMain.on('window-maximize', () => {
-  mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize();
-});
-ipcMain.on('window-close', () => mainWindow.close());
-
 ipcMain.on('toggle-devtools', () => {
   if (activeView) {
     activeView.webContents.toggleDevTools();
   }
+});
+
+// Shortcuts overlay: temporarily remove BrowserView so the toast is visible
+ipcMain.on('toggle-shortcuts', () => {
+  shortcutsVisible = !shortcutsVisible;
+  if (shortcutsVisible) {
+    // Hide the BrowserView so the HTML toast shows on top
+    if (activeView) {
+      activeView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+    }
+  } else {
+    // Restore the BrowserView
+    layoutViews();
+  }
+  mainWindow.webContents.send('shortcuts-toggled', shortcutsVisible);
 });
 
 app.whenReady().then(createWindow);
