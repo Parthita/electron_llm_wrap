@@ -1,0 +1,36 @@
+{
+  "name": "ai-chat-wrapper",
+  "version": "1.0.0",
+  "description": "Lightweight Electron wrapper for ChatGPT, Claude, Gemini, and DeepSeek",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --linux --win --mac",
+    "build-linux": "electron-builder --linux",
+    "build-win": "electron-builder --win",
+    "build-mac": "electron-builder --mac"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.aichat.wrapper",
+    "productName": "AI Chat",
+    "directories": {
+      "output": "dist"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Utility"
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "mac": {
+      "target": ["dmg"]
+    }
+  }
+}

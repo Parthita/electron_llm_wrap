@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Chat</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0e0e0;
+      overflow: hidden;
+      height: 100vh;
+      user-select: none;
+    }
+
+    /* ── Title bar ── */
+    #titlebar {
+      display: flex;
+      align-items: center;
+      height: 38px;
+      background: #16162a;
+      -webkit-app-region: drag;
+      border-bottom: 1px solid #1e1e3a;
+      position: relative;
+      z-index: 100;
+    }
+
+    #titlebar-left {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding-left: 6px;
+      -webkit-app-region: no-drag;
+    }
+
+    .tb-btn {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: transparent;
+      color: #888;
+      cursor: pointer;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .tb-btn:hover { background: #2a2a4a; color: #ccc; }
+    .tb-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+    #titlebar-title {
+      flex: 1;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 500;
+      color: #777;
+      letter-spacing: 0.5px;
+    }
+
+    #titlebar-right {
+      display: flex;
+      -webkit-app-region: no-drag;
+    }
+
+    .win-btn {
+      width: 46px;
+      height: 38px;
+      border: none;
+      background: transparent;
+      color: #888;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .win-btn:hover { background: #2a2a4a; color: #ccc; }
+    .win-btn.close:hover { background: #e53935; color: #fff; }
+    .win-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      position: fixed;
+      top: 38px;
+      left: 0;
+      width: 56px;
+      bottom: 0;
+      background: #12122a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 0;
+      gap: 6px;
+      z-index: 90;
+      border-right: 1px solid #1e1e3a;
+      transition: transform 0.2s ease;
+    }
+
+    #sidebar.hidden {
+      transform: translateX(-56px);
+    }
+
+    .svc-btn {
+      width: 42px;
+      height: 42px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+      opacity: 0.5;
+      position: relative;
+    }
+
+    .svc-btn:hover {
+      transform: scale(1.1);
+      opacity: 0.8;
+    }
+
+    .svc-btn.active {
+      opacity: 1;
+      box-shadow: 0 0 12px rgba(255,255,255,0.15);
+      transform: scale(1.05);
+    }
+
+    .svc-btn.active::before {
+      content: '';
+      position: absolute;
+      left: -7px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 3px;
+      height: 20px;
+      border-radius: 0 3px 3px 0;
+      background: currentColor;
+    }
+
+    .svc-btn[data-svc="chatgpt"]  { background: #10a37f; }
+    .svc-btn[data-svc="claude"]   { background: #d97706; }
+    .svc-btn[data-svc="gemini"]   { background: #4285f4; }
+    .svc-btn[data-svc="deepseek"] { background: #5b6ee1; }
+
+    .sidebar-spacer { flex: 1; }
+
+    .sidebar-bottom-btn {
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 10px;
+      background: transparent;
+      color: #555;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .sidebar-bottom-btn:hover { background: #1e1e3a; color: #aaa; }
+    .sidebar-bottom-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+    /* ── Tooltip ── */
+    .svc-btn .tooltip {
+      position: absolute;
+      left: 54px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: #222244;
+      color: #ddd;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 200;
+    }
+    .svc-btn:hover .tooltip { opacity: 1; }
+
+    /* ── Keyboard shortcut hints ── */
+    #shortcuts-toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1a1a3a;
+      border: 1px solid #2a2a4a;
+      border-radius: 10px;
+      padding: 12px 20px;
+      font-size: 12px;
+      color: #888;
+      z-index: 500;
+      display: none;
+      gap: 16px;
+    }
+    #shortcuts-toast.show { display: flex; }
+    #shortcuts-toast kbd {
+      background: #2a2a4a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #bbb;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Title bar -->
+  <div id="titlebar">
+    <div id="titlebar-left">
+      <button class="tb-btn" id="btn-toggle-sidebar" title="Toggle sidebar (Ctrl+B)">
+        <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <button class="tb-btn" id="btn-back" title="Back (Alt+Left)">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button class="tb-btn" id="btn-forward" title="Forward (Alt+Right)">
+        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <button class="tb-btn" id="btn-reload" title="Reload (Ctrl+R)">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </button>
+    </div>
+    <div id="titlebar-title">AI Chat</div>
+    <div id="titlebar-right">
+      <button class="win-btn" onclick="api.minimize()" title="Minimize">
+        <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+      <button class="win-btn" onclick="api.maximize()" title="Maximize">
+        <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+      </button>
+      <button class="win-btn close" onclick="api.close()" title="Close">
+        <svg viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <button class="svc-btn" data-svc="chatgpt" title="ChatGPT">
+      G
+      <span class="tooltip">ChatGPT &middot; Ctrl+1</span>
+    </button>
+    <button class="svc-btn" data-svc="claude" title="Claude">
+      C
+      <span class="tooltip">Claude &middot; Ctrl+2</span>
+    </button>
+    <button class="svc-btn" data-svc="gemini" title="Gemini">
+      G
+      <span class="tooltip">Gemini &middot; Ctrl+3</span>
+    </button>
+    <button class="svc-btn" data-svc="deepseek" title="DeepSeek">
+      D
+      <span class="tooltip">DeepSeek &middot; Ctrl+4</span>
+    </button>
+
+    <div class="sidebar-spacer"></div>
+
+    <button class="sidebar-bottom-btn" id="btn-devtools" title="DevTools (F12)">
+      <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+    </button>
+    <button class="sidebar-bottom-btn" id="btn-shortcuts" title="Keyboard shortcuts">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </button>
+  </div>
+
+  <!-- Shortcuts toast -->
+  <div id="shortcuts-toast">
+    <span><kbd>Ctrl+1-4</kbd> Switch service</span>
+    <span><kbd>Ctrl+B</kbd> Toggle sidebar</span>
+    <span><kbd>Ctrl+R</kbd> Reload</span>
+    <span><kbd>F12</kbd> DevTools</span>
+    <span><kbd>Alt+&larr;&rarr;</kbd> Navigate</span>
+  </div>
+
+  <script>
+    const services = ['chatgpt', 'claude', 'gemini', 'deepseek'];
+    const names = { chatgpt: 'ChatGPT', claude: 'Claude', gemini: 'Gemini', deepseek: 'DeepSeek' };
+    const btns = document.querySelectorAll('.svc-btn');
+
+    // Service buttons
+    btns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        api.switchService(btn.dataset.svc);
+      });
+    });
+
+    // Title bar buttons
+    document.getElementById('btn-toggle-sidebar').addEventListener('click', () => api.toggleSidebar());
+    document.getElementById('btn-back').addEventListener('click', () => api.goBack());
+    document.getElementById('btn-forward').addEventListener('click', () => api.goForward());
+    document.getElementById('btn-reload').addEventListener('click', () => api.reload());
+    document.getElementById('btn-devtools').addEventListener('click', () => api.devtools());
+
+    // Shortcuts toast toggle
+    let shortcutsVisible = false;
+    document.getElementById('btn-shortcuts').addEventListener('click', () => {
+      shortcutsVisible = !shortcutsVisible;
+      document.getElementById('shortcuts-toast').classList.toggle('show', shortcutsVisible);
+    });
+
+    // Listen for service change from main process
+    api.onServiceChanged((key) => {
+      btns.forEach(b => b.classList.toggle('active', b.dataset.svc === key));
+      document.getElementById('titlebar-title').textContent = names[key] || 'AI Chat';
+    });
+
+    // Listen for sidebar toggle
+    api.onSidebarToggled((visible) => {
+      document.getElementById('sidebar').classList.toggle('hidden', !visible);
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      // Ctrl+1-4 to switch services
+      if (e.ctrlKey && e.key >= '1' && e.key <= '4') {
+        e.preventDefault();
+        const idx = parseInt(e.key) - 1;
+        if (services[idx]) api.switchService(services[idx]);
+      }
+      // Ctrl+B toggle sidebar
+      if (e.ctrlKey && e.key === 'b') {
+        e.preventDefault();
+        api.toggleSidebar();
+      }
+      // Ctrl+R reload
+      if (e.ctrlKey && e.key === 'r') {
+        e.preventDefault();
+        api.reload();
+      }
+      // F12 devtools
+      if (e.key === 'F12') {
+        e.preventDefault();
+        api.devtools();
+      }
+      // Alt+Left/Right navigation
+      if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); api.goBack(); }
+      if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); api.goForward(); }
+      // Escape to close shortcuts toast
+      if (e.key === 'Escape' && shortcutsVisible) {
+        shortcutsVisible = false;
+        document.getElementById('shortcuts-toast').classList.remove('show');
+      }
+    });
+  </script>
+
+</body>
+</html>
